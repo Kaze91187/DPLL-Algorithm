@@ -8,6 +8,9 @@
 #include <iostream>
 #include <fstream>
 #include <ctime>
+#include <sstream>
+#include <stdexcept>
+#include <algorithm>
 
 using namespace std;
 #define TRUE 1
@@ -41,7 +44,8 @@ void Start();
 
 HeadNode* CreateClause(int &,string &);
 
-status DPLL(HeadNode *LIST,consequence *result);
+status DPLL(HeadNode *LIST, consequence *result, int variableCount);
+void DestroyFormula(HeadNode *LIST);
 HeadNode* IsSingleClause(HeadNode*);
 status IsEmptyClause(HeadNode*);
 HeadNode* ADDSingleClause(HeadNode*,int);
@@ -59,5 +63,6 @@ string ToCnf(int a[][COL],int holes);
 string createSudokuToFile();
 status SudoDPLL(HeadNode *LIST,conse *result,int VARNUM);
 void SudokuShow(conse *result,int VARNUM);
+int solveStarSudoku(const string& filename);
 
 #endif //WORKSHOP_GLOBAL_H

@@ -4,6 +4,10 @@
 #define WRONG -1
 static int T = 0;
 
+static int sudokuVariable(int row, int column, int digit) {
+    return (row * 9 + column) * 9 + digit;
+}
+
 int Digit(int a[][COL], int i, int j) {//递归填充数独元素
     if (i < ROW && j < COL) {
         int x,y,k;
@@ -72,7 +76,7 @@ void createStartinggrid(const int a[][COL], int b[][COL], int numDigits) {//随�
         for( j = 0; j < COL ; j++)
             b[i][j] = a[i][j];
 
-    int c[numDigits][2];
+    int c[ROW * COL][2];
     int m,flag = 0;
 
     for( i = 0; i < numDigits ; i++) {
@@ -107,18 +111,19 @@ string ToCnf(int a[][COL],int holes) {
     ofstream in ("sudoku.cnf");//定义输入文件
     if(!in.is_open())
         cout<<"can't open!\n";
-    in<<"p"<<" "<<"cnf"<<" "<<729<<" "<<8829+81-holes<<" "<<endl;
+    // 8100 structural clauses plus one unit clause for every given cell.
+    in << "p cnf 729 " << 8100 + 81 - holes << '\n';
     //single clause
     for (int x = 0; x < ROW; ++x) {
         for (int y = 0; y < COL; ++y)
             if(a[x][y] != 0)
-                in<<(x+1)*100 + (y+1)*10 + a[x][y]<<" "<<0<<endl;
+                in << sudokuVariable(x, y, a[x][y]) << " 0\n";
     }
     //entry
     for (int x = 1; x <= 9; ++x) {
         for (int y = 1; y <= 9; ++y) {
             for (int z = 1; z <= 9; ++z)
-                in << x * 100 + y * 10 + z << " ";
+                in << sudokuVariable(x - 1, y - 1, z) << " ";
             in<<0;
             in<<endl;
         }
@@ -128,16 +133,16 @@ string ToCnf(int a[][COL],int holes) {
         for (int z = 1; z <= 9; ++z)
             for (int x = 1; x <= 8; ++x)
                 for (int i = x+1; i <= 9; ++i)
-                    in<<0 - (x*100 + y*10 + z)<<" "
-                      <<0 - (i*100 + y*10 + z)<<" "<<0<<endl;
+                    in << -sudokuVariable(y - 1, x - 1, z) << " "
+                       << -sudokuVariable(y - 1, i - 1, z) << " 0\n";
     }
     //column
     for (int x = 1; x <= 9; ++x) {
         for (int z = 1; z <=9 ; ++z)
             for (int y = 1; y <= 8; ++y)
                 for (int i = y+1; i <= 9; ++i)
-                    in<<0-(x*100 + y*10 + z)<<" "
-                      <<0-(x*100 + i*10 + z)<<" "<<0<<endl;
+                    in << -sudokuVariable(y - 1, x - 1, z) << " "
+                       << -sudokuVariable(i - 1, x - 1, z) << " 0\n";
     }
     //3*3 sub-grids
     for (int z = 1; z <= 9 ; ++z) {
@@ -146,8 +151,8 @@ string ToCnf(int a[][COL],int holes) {
                 for (int x = 1; x <= 3 ; ++x)
                     for (int y = 1; y <= 3; ++y)
                         for (int k = y+1; k <= 3; ++k)
-                            in<<0 - ((3*i+x)*100 + (3*j+y)*10 + z)<<" "
-                              <<0-((3*i+x)*100 + (3*j+k)*10 + z)<<" "<<0<<endl;
+                            in << -sudokuVariable(3*i+x-1, 3*j+y-1, z) << " "
+                               << -sudokuVariable(3*i+x-1, 3*j+k-1, z) << " 0\n";
     }
     for (int z = 1; z <= 9; z++) {
         for (int i = 0; i <= 2; i++)
@@ -156,11 +161,11 @@ string ToCnf(int a[][COL],int holes) {
                     for (int y = 1; y <= 3; y++)
                         for (int k = x + 1; k <= 3; k++)
                             for (int l = 1; l <= 3; l++)
-                                in << 0 - ((3*i+x)*100 + (3*j+y)*10 + z) << ' '
-                                   << 0 - ((3*i+k)*100 + (3*j+l)*10 + z) << ' ' << 0 <<endl;
+                                in << -sudokuVariable(3*i+x-1, 3*j+y-1, z) << ' '
+                                   << -sudokuVariable(3*i+k-1, 3*j+l-1, z) << " 0\n";
     }
     in.close();
-    return string("cmake-build-debug\\sudoku.cnf");
+    return string("sudoku.cnf");
 }
 
 string createSudokuToFile() {

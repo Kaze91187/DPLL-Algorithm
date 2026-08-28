@@ -3,6 +3,20 @@
 //
 #include "Global.h"
 
+void DestroyFormula(HeadNode* LIST) {
+    while (LIST != nullptr) {
+        HeadNode* nextClause = LIST->down;
+        DataNode* literal = LIST->right;
+        while (literal != nullptr) {
+            DataNode* nextLiteral = literal->next;
+            delete literal;
+            literal = nextLiteral;
+        }
+        delete LIST;
+        LIST = nextClause;
+    }
+}
+
 status IsEmptyClause(HeadNode* LIST) {
     HeadNode* PHead = LIST;
     while (PHead != nullptr) {
@@ -118,27 +132,102 @@ void show(struct consequence *result,int VarNum) {
     cout<<endl;
 }
 
-status DPLL(HeadNode *LIST,consequence *result) {
-    //单子句规则
-    HeadNode* Pfind = LIST;
-    HeadNode* SingleClause = IsSingleClause(Pfind);
-    while (SingleClause != nullptr) {
-        SingleClause->right->data > 0 ? result[abs(SingleClause->right->data)-1].value = TRUE : result[abs(SingleClause->right->data)-1].value = FALSE;
-        int temp = SingleClause->right->data;
-        DeleteHeadNode(SingleClause,LIST);//删除单子句这一行
-        DeleteDataNode(temp,LIST);//删除相等或相反数的节点
-        if(!LIST) return TRUE;
-        else if(IsEmptyClause(LIST)) return FALSE;
-        Pfind = LIST;
-        SingleClause = IsSingleClause(Pfind);//回到头节点继续进行检测是否有单子句
+static int clauseState(HeadNode* clause, int* assignment, int& unitLiteral) {
+    int unassignedCount = 0;
+    unitLiteral = 0;
+    for (DataNode* literal = clause->right; literal != nullptr; literal = literal->next) {
+        int variable = abs(literal->data);
+        int value = assignment[variable];
+        if (value == -1) {
+            unassignedCount++;
+            unitLiteral = literal->data;
+        } else if ((literal->data > 0 && value == TRUE) ||
+                   (literal->data < 0 && value == FALSE)) {
+            return TRUE;
+        }
     }
-    //分裂策略
-    int Var = LIST->right->data;//选取变元
-    HeadNode* replica = Duplication(LIST);//存放LIST的副本replica
-    HeadNode *temp1 = ADDSingleClause(LIST,Var);//装载变元成为单子句
-    if(DPLL(temp1,result)) return TRUE;
-    else {
-        HeadNode *temp2 = ADDSingleClause(replica,-Var);
-        return DPLL(temp2,result);
+    if (unassignedCount == 0)
+        return FALSE;
+    // -1 means unresolved; 0 is reserved for a conflicting (false) clause.
+    return unassignedCount == 1 ? 2 : -1;
+}
+
+static bool solveDPLL(HeadNode* formula, int variableCount, int* assignment) {
+    while (true) {
+        bool changed = false;
+        for (HeadNode* clause = formula; clause != nullptr; clause = clause->down) {
+            int unitLiteral = 0;
+            int state = clauseState(clause, assignment, unitLiteral);
+            if (state == FALSE)
+                return false;
+            if (state == 2) {
+                int variable = abs(unitLiteral);
+                int requiredValue = unitLiteral > 0 ? TRUE : FALSE;
+                if (assignment[variable] != -1 && assignment[variable] != requiredValue)
+                    return false;
+                if (assignment[variable] == -1) {
+                    assignment[variable] = requiredValue;
+                    changed = true;
+                }
+            }
+        }
+        if (!changed)
+            break;
     }
+
+    int* frequency = new int[variableCount + 1]();
+    int branchVariable = 0;
+    for (HeadNode* clause = formula; clause != nullptr; clause = clause->down) {
+        int unitLiteral = 0;
+        if (clauseState(clause, assignment, unitLiteral) == TRUE)
+            continue;
+        for (DataNode* literal = clause->right; literal != nullptr; literal = literal->next) {
+            int variable = abs(literal->data);
+            if (assignment[variable] == -1) {
+                frequency[variable]++;
+                if (frequency[variable] > frequency[branchVariable])
+                    branchVariable = variable;
+            }
+        }
+    }
+    delete[] frequency;
+
+    if (branchVariable == 0)
+        return true;
+
+    int* saved = new int[variableCount + 1];
+    for (int i = 0; i <= variableCount; ++i)
+        saved[i] = assignment[i];
+    assignment[branchVariable] = TRUE;
+    if (solveDPLL(formula, variableCount, assignment)) {
+        delete[] saved;
+        return true;
+    }
+    for (int i = 0; i <= variableCount; ++i)
+        assignment[i] = saved[i];
+    assignment[branchVariable] = FALSE;
+    if (solveDPLL(formula, variableCount, assignment)) {
+        delete[] saved;
+        return true;
+    }
+    for (int i = 0; i <= variableCount; ++i)
+        assignment[i] = saved[i];
+    delete[] saved;
+    return false;
+}
+
+status DPLL(HeadNode *LIST, consequence *result, int variableCount) {
+    if (variableCount == 0)
+        return LIST == nullptr || !IsEmptyClause(LIST);
+
+    int* assignment = new int[variableCount + 1];
+    for (int i = 0; i <= variableCount; ++i)
+        assignment[i] = -1;
+    bool satisfiable = solveDPLL(LIST, variableCount, assignment);
+    if (satisfiable) {
+        for (int i = 1; i <= variableCount; ++i)
+            result[i - 1].value = assignment[i] == -1 ? TRUE : assignment[i];
+    }
+    delete[] assignment;
+    return satisfiable ? TRUE : FALSE;
 }

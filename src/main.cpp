@@ -1,89 +1,72 @@
-#include "Modular/Global.h"
+#include "Global.h"
 
+static string resultPath(const string& cnfPath) {
+    size_t slash = cnfPath.find_last_of("/\\");
+    size_t dot = cnfPath.find_last_of('.');
+    if (dot == string::npos || (slash != string::npos && dot < slash))
+        dot = cnfPath.size();
+    return cnfPath.substr(0, dot) + ".res";
+}
 
+static void printFormula(HeadNode* formula) {
+    for (HeadNode* clause = formula; clause != nullptr; clause = clause->down) {
+        for (DataNode* literal = clause->right; literal != nullptr; literal = literal->next)
+            cout << literal->data << ' ';
+        cout << "0\n";
+    }
+}
 
-int main() {
-    Start();
-    int choice = 0;
-    cin>>choice;
-    while (choice){
-        if(choice == 1) {
-        string filename = createSudokuToFile();
-        int VARNUM;
-        HeadNode* LIST = CreateClause(VARNUM,filename);
-        conse SudoResult[VARNUM];//记录最终的真假值
-        clock_t StartTime,EndTime;
-        StartTime = clock();
-        int value = SudoDPLL(LIST,SudoResult,VARNUM);
-        EndTime = clock();
-        cout<<"T "<<(double)(EndTime-StartTime)/CLOCKS_PER_SEC*1000.0<<" ms\n";
-        if(value == 1)
-            SudokuShow(SudoResult,VARNUM);
-        else
-            cout<<"there is no anwser.";
+static int solveFile(const string& filename, bool verify) {
+    int variableCount = 0;
+    string input = filename;
+    HeadNode* formula = CreateClause(variableCount, input);
+    if (verify) {
+        cout << "CNF verification:\n";
+        printFormula(formula);
+    }
+
+    consequence* result = new consequence[variableCount];
+    clock_t start = clock();
+    status value = DPLL(formula, result, variableCount);
+    clock_t end = clock();
+
+    string output = resultPath(filename);
+    ofstream resultFile(output);
+    if (!resultFile)
+        throw runtime_error("Cannot create result file: " + output);
+    resultFile << "s " << (value == TRUE ? 1 : 0) << '\n';
+    resultFile << "v";
+    if (value == TRUE) {
+        for (int i = 0; i < variableCount; ++i)
+            resultFile << ' ' << (result[i].value == TRUE ? i + 1 : -(i + 1));
+    }
+    resultFile << " 0\n";
+    resultFile << "t " << (double)(end - start) / CLOCKS_PER_SEC * 1000.0 << '\n';
+    cout << "Result: " << (value == TRUE ? "SAT" : "UNSAT")
+         << "\nTime: " << (double)(end - start) / CLOCKS_PER_SEC * 1000.0
+         << " ms\nSaved: " << output << '\n';
+    DestroyFormula(formula);
+    delete[] result;
+    return value == TRUE ? 0 : 1;
+}
+
+int main(int argc, char* argv[]) {
+    try {
+        if (argc == 3 && string(argv[1]) == "--star")
+            return solveStarSudoku(argv[2]);
+        if (argc < 2 || argc > 3) {
+            cout << "Usage: dpll <file.cnf> [--verify]\n"
+                 << "       dpll --star <puzzle.txt>\n";
+            return 0;
         }
-
-        else if (choice == 2) {//SAT
-            int VARNUM;
-            string filename = "sud00009.cnf";
-            HeadNode* LIST = CreateClause(VARNUM,filename);
-            consequence result[VARNUM];//记录最终的真假值
-            clock_t StartTime,EndTime;
-            //cout<<"Result: \n";
-            //StartTime = clock();
-            //int value = DPLL(LIST,result);
-            //EndTime = clock();
-            //if(value) {
-            //    cout << "S " << TRUE << endl;
-            //    show(result, VARNUM);//输出解
-            //}
-            //else {
-            //    cout << "S " << NoAnwser << endl;
-            //    cout<<"V "<<endl;
-            //}
-            //cout<<"T "<<(double)(EndTime-StartTime)/CLOCKS_PER_SEC*1000.0<<" ms\n";
-
-             //写到文件
-             string suffix = ".res";
-             string name = "solution";
-             string Outputfile = name + suffix;
-             ofstream fos(Outputfile);
-             if(!fos.is_open()) {
-                 cout<<"Can not open a new file.\n";
-                 exit;
-             }
-
-            StartTime = clock();
-            int value = DPLL(LIST,result);
-            EndTime = clock();
-            //结果
-            if(value) {
-                fos << "S " << TRUE << endl;
-                fos<<"V ";
-                for(int i = 0; i < VARNUM; i++) {
-                    if (result[i].value == TRUE)
-                        fos<<i+1<<" ";
-                    else if(result[i].value == FALSE)
-                        fos<<-(i+1)<<" ";
-                    else
-                        fos<<(i+1)<<" ";//剩下一堆可true可false，就索性输出true
-                }
-                fos<<endl;
-            }
-            else {
-                fos << "S " << NoAnwser << endl;
-                fos<<"V ";
-                fos<<endl;
-            }
-            //时间
-            fos<<"T "<<(double)(EndTime-StartTime)/CLOCKS_PER_SEC*1000.0<<" ms\n";
-            fos.close();
-
+        if (argc == 3 && string(argv[2]) != "--verify") {
+            cout << "Usage: dpll <file.cnf> [--verify]\n"
+                 << "       dpll --star <puzzle.txt>\n";
+            return 2;
         }
-        else { //其他值不理睬
-            cout<<"Please input the right num! ";
-            exit;
-        }
-        choice = 0;
+        return solveFile(argv[1], argc == 3);
+    } catch (const exception& error) {
+        cerr << error.what() << '\n';
+        return 2;
     }
 }
