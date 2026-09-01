@@ -7,7 +7,15 @@
 1. 使用赋值轨迹和递归检查点回溯，只撤销当前分支产生的赋值，不再在每层复制整个赋值数组。
 2. 使用短子句加权的分支策略，分别统计正、负文字得分，选择总得分最高的变量，并优先探索得分更高的真假方向。权重通过左移计算。
 
-`rewrite_dpll_baseline.exe` 是优化前基线，`rewrite_dpll_optimized.exe` 是优化版，`rewrite_dpll.exe` 默认指向优化版。
+`rewrite_dpll_baseline.exe` 是优化前基线，`rewrite_dpll_optimized.exe` 是第一版优化，`rewrite_dpll_storage.exe` 是第二版连续存储优化，`rewrite_dpll.exe` 默认指向第二版。
+
+第二版保留用于解析与人工验证的二维链表，在进入 DPLL 时转换为连续存储：
+
+- `literals[]` 连续保存全部文字；
+- `clauseOffsets[]` 保存每个子句在文字数组中的起止位置；
+- 正负文字评分数组只在 DPLL 入口申请一次，在递归中复用。
+
+第一版源码是 `DPLLSolver.cpp`，第二版源码是 `DPLLSolverStorage.cpp`，编译时二选一，不能同时加入编译命令。
 
 建议按以下顺序手写并测试：
 
@@ -21,15 +29,15 @@
 
 ```powershell
 g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
-  main.cpp CnfParser.cpp DPLLSolver.cpp StarSudoku.cpp `
-  -o rewrite_dpll_optimized.exe
+  main.cpp CnfParser.cpp DPLLSolverStorage.cpp StarSudoku.cpp `
+  -o rewrite_dpll_storage.exe
 ```
 
 ## 运行
 
 ```powershell
-.\rewrite_dpll_optimized.exe ..\problems\sat-20.cnf --verify
-.\rewrite_dpll_optimized.exe --star <星形数独文件>
+.\rewrite_dpll_storage.exe ..\problems\sat-20.cnf --verify
+.\rewrite_dpll_storage.exe --star <星形数独文件>
 ```
 
 详细测试数据见 `BENCHMARK.md`。
