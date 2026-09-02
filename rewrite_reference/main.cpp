@@ -11,6 +11,16 @@ static std::string ResultPath(const std::string& cnfPath) {
     return cnfPath.substr(0, dot) + ".res";
 }
 
+static std::string ProgramFilePath(
+    const std::string& programPath,
+    const std::string& filename
+) {
+    const std::size_t slash = programPath.find_last_of("/\\");
+    return slash == std::string::npos
+               ? filename
+               : programPath.substr(0, slash + 1) + filename;
+}
+
 static void PrintFormula(const Headnode* formula) {
     for (const Headnode* clause = formula; clause != nullptr; clause = clause->next) {
         for (const Datanode* node = clause->first; node != nullptr; node = node->next)
@@ -63,6 +73,12 @@ static int SolveFile(const std::string& filename, bool verify) {
 
 int main(int argc, char* argv[]) {
     try {
+        if (argc == 1) {
+            return Playstar(
+                ProgramFilePath(argv[0], "Asterisk-sudoku-levels.txt")
+            );
+        }
+
         if (argc == 3 && std::string(argv[1]) == "--star")
             return Solvestar(argv[2]);
 
@@ -74,7 +90,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Usage: rewrite_dpll <file.cnf> [--verify]\n"
                       << "       rewrite_dpll --star <puzzle.txt>\n"
                       << "       rewrite_dpll --game <puzzle.txt>\n";
-            return argc < 2 ? 0 : 2;
+            return 2;
         }
 
         return SolveFile(argv[1], argc == 3);

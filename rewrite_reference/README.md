@@ -55,4 +55,7 @@ g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
 右侧显示 1～9 的 3×3 小键盘；可以检查完整答案、随时直接解析、重置本关，
 或切换上一关和下一关。选中玩家填写的格子后，也可以按退格键或 Delete 清空。
 
+项目附带 `Asterisk-sudoku-levels.txt`，其中包含 20 个可解关卡。直接双击
+`rewrite_dpll.exe`，或在终端中不带参数运行它，会自动读取这个内置题库并进入游戏。
+
 详细测试数据见 `BENCHMARK.md`。
