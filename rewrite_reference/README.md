@@ -33,20 +33,26 @@
 3. `DPLLSolver.cpp`：判断子句状态、单子句传播、选取变量、递归分支和回溯。
 4. `main.cpp`：读取命令行、计时、输出 `.res`。
 5. `StarSudoku.cpp`：将格、行、列、宫、星形区域约束加入公式，再调用同一个 DPLL。
+6. `StarSudokuGame.cpp`：读取题库并建立 Windows 图形游戏界面。
 
 ## 编译
 
 ```powershell
 g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
-  main.cpp CnfParser.cpp DPLLSolverIncremental.cpp StarSudoku.cpp `
-  -o rewrite_dpll_incremental.exe
+  main.cpp CnfParser.cpp DPLLSolverIncremental.cpp StarSudoku.cpp StarSudokuGame.cpp `
+  -lgdi32 -luser32 -o rewrite_dpll.exe
 ```
 
 ## 运行
 
 ```powershell
-.\rewrite_dpll_incremental.exe ..\problems\sat-20.cnf --verify
-.\rewrite_dpll_incremental.exe --star <星形数独文件>
+.\rewrite_dpll.exe ..\problems\sat-20.cnf --verify
+.\rewrite_dpll.exe --star <星形数独文件>
+.\rewrite_dpll.exe --game <星形数独文件>
 ```
+
+游戏模式会把文件中的每个合法 81 字符格局作为一关。点击非提示格后，
+右侧显示 1～9 的 3×3 小键盘；可以检查完整答案、随时直接解析、重置本关，
+或切换上一关和下一关。选中玩家填写的格子后，也可以按退格键或 Delete 清空。
 
 详细测试数据见 `BENCHMARK.md`。

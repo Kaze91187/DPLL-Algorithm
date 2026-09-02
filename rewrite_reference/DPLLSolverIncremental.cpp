@@ -8,9 +8,9 @@ typedef struct PackedFormula {
 } PackedFormula;
 
 typedef struct OccurrenceTable {
-    int literalKindCount = 0;
+    int kindcount = 0;
     int* offsets = nullptr;
-    int* clauseIndices = nullptr;
+    int* clauseidx = nullptr;
 } OccurrenceTable;
 
 typedef struct SolverState {
@@ -20,14 +20,14 @@ typedef struct SolverState {
     int* trail = nullptr;
     int trailSize = 0;
     int* queue = nullptr;
-    int queueCapacity = 0;
+    int queuemax = 0;
     int* touchedClauses = nullptr;
     int* clauseStamp = nullptr;
     int currentStamp = 0;
     unsigned long long* scores = nullptr;
 } SolverState;
 
-void DestroyFormula(Headnode* formula) {
+void Destroy(Headnode* formula) {
     while (formula != nullptr) {
         Headnode* nextClause = formula->next;
         Datanode* literal = formula->first;
@@ -41,9 +41,9 @@ void DestroyFormula(Headnode* formula) {
     }
 }
 
-static int LiteralIndex(int literal) {
-    const int variable = std::abs(literal) - 1;
-    return variable * 2 + (literal < 0 ? 1 : 0);
+static int Literalidx(int literal) {
+    const int var = std::abs(literal) - 1;
+    return var * 2 + (literal < 0 ? 1 : 0);
 }
 
 static PackedFormula PackFormula(const Headnode* formula) {
@@ -58,18 +58,18 @@ static PackedFormula PackFormula(const Headnode* formula) {
                           ? nullptr
                           : new int[packed.literalCount];
 
-    int clauseIndex = 0;
-    int literalIndex = 0;
+    int clauseidx = 0;
+    int literalidx = 0;
     for (const Headnode* clause = formula; clause != nullptr; clause = clause->next) {
-        packed.clauseOffsets[clauseIndex++] = literalIndex;
+        packed.clauseOffsets[clauseidx++] = literalidx;
         for (const Datanode* node = clause->first; node != nullptr; node = node->next)
-            packed.literals[literalIndex++] = node->data;
+            packed.literals[literalidx++] = node->data;
     }
-    packed.clauseOffsets[packed.clauseCount] = literalIndex;
+    packed.clauseOffsets[packed.clauseCount] = literalidx;
     return packed;
 }
 
-static void DestroyPackedFormula(PackedFormula& formula) {
+static void DestroyPF(PackedFormula& formula) {
     delete[] formula.clauseOffsets;
     delete[] formula.literals;
     formula.clauseOffsets = nullptr;
@@ -78,30 +78,30 @@ static void DestroyPackedFormula(PackedFormula& formula) {
 
 static OccurrenceTable BuildOccurrenceTable(
     const PackedFormula& formula,
-    int variableCount
+    int varcount
 ) {
     OccurrenceTable table;
-    table.literalKindCount = variableCount * 2;
-    table.offsets = new int[table.literalKindCount + 1]();
+    table.kindcount = varcount * 2;
+    table.offsets = new int[table.kindcount + 1]();
 
     for (int i = 0; i < formula.literalCount; ++i)
-        ++table.offsets[LiteralIndex(formula.literals[i]) + 1];
+        ++table.offsets[Literalidx(formula.literals[i]) + 1];
 
-    for (int i = 1; i <= table.literalKindCount; ++i)
+    for (int i = 1; i <= table.kindcount; ++i)
         table.offsets[i] += table.offsets[i - 1];
 
-    table.clauseIndices = formula.literalCount == 0
-                              ? nullptr
-                              : new int[formula.literalCount];
-    int* cursor = new int[table.literalKindCount];
-    for (int i = 0; i < table.literalKindCount; ++i)
+    table.clauseidx = formula.literalCount == 0
+                          ? nullptr
+                          : new int[formula.literalCount];
+    int* cursor = new int[table.kindcount];
+    for (int i = 0; i < table.kindcount; ++i)
         cursor[i] = table.offsets[i];
 
     for (int clause = 0; clause < formula.clauseCount; ++clause) {
         for (int i = formula.clauseOffsets[clause];
              i < formula.clauseOffsets[clause + 1]; ++i) {
-            const int index = LiteralIndex(formula.literals[i]);
-            table.clauseIndices[cursor[index]++] = clause;
+            const int idx = Literalidx(formula.literals[i]);
+            table.clauseidx[cursor[idx]++] = clause;
         }
     }
 
@@ -109,11 +109,11 @@ static OccurrenceTable BuildOccurrenceTable(
     return table;
 }
 
-static void DestroyOccurrenceTable(OccurrenceTable& table) {
+static void DestroyOT(OccurrenceTable& table) {
     delete[] table.offsets;
-    delete[] table.clauseIndices;
+    delete[] table.clauseidx;
     table.offsets = nullptr;
-    table.clauseIndices = nullptr;
+    table.clauseidx = nullptr;
 }
 
 static int FindUnassignedLiteral(
@@ -124,7 +124,7 @@ static int FindUnassignedLiteral(
     for (int i = formula.clauseOffsets[clause];
          i < formula.clauseOffsets[clause + 1]; ++i) {
         const int literal = formula.literals[i];
-        if (assignment[std::abs(literal)] == NO_ANSWER)
+        if (assignment[std::abs(literal)] == noanswer)
             return literal;
     }
     return 0;
@@ -148,14 +148,14 @@ static bool ApplyLiteral(
     SolverState& state,
     int& queueTail
 ) {
-    const int variable = std::abs(literal);
+    const int var = std::abs(literal);
     const int value = literal > 0 ? TRUE : FALSE;
 
-    if (state.assignment[variable] != NO_ANSWER)
-        return state.assignment[variable] == value;
+    if (state.assignment[var] != noanswer)
+        return state.assignment[var] == value;
 
-    state.assignment[variable] = value;
-    state.trail[state.trailSize++] = variable;
+    state.assignment[var] = value;
+    state.trail[state.trailSize++] = var;
 
     ++state.currentStamp;
     if (state.currentStamp == 0) {
@@ -165,20 +165,20 @@ static bool ApplyLiteral(
     }
     int touchedCount = 0;
 
-    const int positiveIndex = LiteralIndex(variable);
-    for (int i = occurrences.offsets[positiveIndex];
-         i < occurrences.offsets[positiveIndex + 1]; ++i) {
-        const int clause = occurrences.clauseIndices[i];
+    const int posidx = Literalidx(var);
+    for (int i = occurrences.offsets[posidx];
+         i < occurrences.offsets[posidx + 1]; ++i) {
+        const int clause = occurrences.clauseidx[i];
         --state.clauseUnassigned[clause];
         if (value == TRUE)
             ++state.clauseSatisfied[clause];
         AddTouchedClause(clause, state, touchedCount);
     }
 
-    const int negativeIndex = LiteralIndex(-variable);
-    for (int i = occurrences.offsets[negativeIndex];
-         i < occurrences.offsets[negativeIndex + 1]; ++i) {
-        const int clause = occurrences.clauseIndices[i];
+    const int negidx = Literalidx(-var);
+    for (int i = occurrences.offsets[negidx];
+         i < occurrences.offsets[negidx + 1]; ++i) {
+        const int clause = occurrences.clauseidx[i];
         --state.clauseUnassigned[clause];
         if (value == FALSE)
             ++state.clauseSatisfied[clause];
@@ -196,7 +196,7 @@ static bool ApplyLiteral(
                 FindUnassignedLiteral(formula, clause, state.assignment);
             if (unitLiteral == 0)
                 return false;
-            if (queueTail >= state.queueCapacity)
+            if (queueTail >= state.queuemax)
                 throw std::runtime_error("Propagation queue overflow");
             state.queue[queueTail++] = unitLiteral;
         }
@@ -229,41 +229,41 @@ static void UndoTo(
     SolverState& state
 ) {
     while (state.trailSize > checkpoint) {
-        const int variable = state.trail[--state.trailSize];
-        const int value = state.assignment[variable];
+        const int var = state.trail[--state.trailSize];
+        const int value = state.assignment[var];
 
-        const int positiveIndex = LiteralIndex(variable);
-        for (int i = occurrences.offsets[positiveIndex];
-             i < occurrences.offsets[positiveIndex + 1]; ++i) {
-            const int clause = occurrences.clauseIndices[i];
+        const int posidx = Literalidx(var);
+        for (int i = occurrences.offsets[posidx];
+             i < occurrences.offsets[posidx + 1]; ++i) {
+            const int clause = occurrences.clauseidx[i];
             ++state.clauseUnassigned[clause];
             if (value == TRUE)
                 --state.clauseSatisfied[clause];
         }
 
-        const int negativeIndex = LiteralIndex(-variable);
-        for (int i = occurrences.offsets[negativeIndex];
-             i < occurrences.offsets[negativeIndex + 1]; ++i) {
-            const int clause = occurrences.clauseIndices[i];
+        const int negidx = Literalidx(-var);
+        for (int i = occurrences.offsets[negidx];
+             i < occurrences.offsets[negidx + 1]; ++i) {
+            const int clause = occurrences.clauseidx[i];
             ++state.clauseUnassigned[clause];
             if (value == FALSE)
                 --state.clauseSatisfied[clause];
         }
-        state.assignment[variable] = NO_ANSWER;
+        state.assignment[var] = noanswer;
     }
 }
 
-static int SelectBranchVariable(
+static int SelectBranchvar(
     const PackedFormula& formula,
-    int variableCount,
+    int varcount,
     SolverState& state,
     int& preferredValue
 ) {
-    unsigned long long* positiveScore = state.scores;
-    unsigned long long* negativeScore = state.scores + variableCount + 1;
-    for (int variable = 0; variable <= variableCount; ++variable) {
-        positiveScore[variable] = 0;
-        negativeScore[variable] = 0;
+    unsigned long long* posScore = state.scores;
+    unsigned long long* negScore = state.scores + varcount + 1;
+    for (int var = 0; var <= varcount; ++var) {
+        posScore[var] = 0;
+        negScore[var] = 0;
     }
 
     for (int clause = 0; clause < formula.clauseCount; ++clause) {
@@ -277,82 +277,82 @@ static int SelectBranchVariable(
         for (int i = formula.clauseOffsets[clause];
              i < formula.clauseOffsets[clause + 1]; ++i) {
             const int literal = formula.literals[i];
-            const int variable = std::abs(literal);
-            if (state.assignment[variable] != NO_ANSWER)
+            const int var = std::abs(literal);
+            if (state.assignment[var] != noanswer)
                 continue;
             if (literal > 0)
-                positiveScore[variable] += weight;
+                posScore[var] += weight;
             else
-                negativeScore[variable] += weight;
+                negScore[var] += weight;
         }
     }
 
-    int branchVariable = 0;
+    int branchvar = 0;
     unsigned long long bestScore = 0;
-    for (int variable = 1; variable <= variableCount; ++variable) {
-        if (state.assignment[variable] != NO_ANSWER)
+    for (int var = 1; var <= varcount; ++var) {
+        if (state.assignment[var] != noanswer)
             continue;
         const unsigned long long total =
-            positiveScore[variable] + negativeScore[variable];
+            posScore[var] + negScore[var];
         if (total > bestScore) {
             bestScore = total;
-            branchVariable = variable;
+            branchvar = var;
         }
     }
 
-    if (branchVariable != 0) {
-        preferredValue = positiveScore[branchVariable] >= negativeScore[branchVariable]
+    if (branchvar != 0) {
+        preferredValue = posScore[branchvar] >= negScore[branchvar]
                              ? TRUE
                              : FALSE;
     }
-    return branchVariable;
+    return branchvar;
 }
 
 static bool SolveRecursive(
     const PackedFormula& formula,
     const OccurrenceTable& occurrences,
-    int variableCount,
+    int varcount,
     SolverState& state
 ) {
     int preferredValue = TRUE;
-    const int branchVariable =
-        SelectBranchVariable(formula, variableCount, state, preferredValue);
-    if (branchVariable == 0)
+    const int branchvar =
+        SelectBranchvar(formula, varcount, state, preferredValue);
+    if (branchvar == 0)
         return true;
 
     const int checkpoint = state.trailSize;
     const int preferredLiteral = preferredValue == TRUE
-                                     ? branchVariable
-                                     : -branchVariable;
+                                     ? branchvar
+                                     : -branchvar;
     if (Propagate(preferredLiteral, formula, occurrences, state) &&
-        SolveRecursive(formula, occurrences, variableCount, state))
+        SolveRecursive(formula, occurrences, varcount, state))
         return true;
     UndoTo(checkpoint, occurrences, state);
 
     if (Propagate(-preferredLiteral, formula, occurrences, state) &&
-        SolveRecursive(formula, occurrences, variableCount, state))
+        SolveRecursive(formula, occurrences, varcount, state))
         return true;
     UndoTo(checkpoint, occurrences, state);
     return false;
 }
 
-Status DPLL(Headnode* formula, int* result, int variableCount) {
+Status DPLL(Headnode* formula, int* result, int varcount) {
     PackedFormula packed = PackFormula(formula);
-    OccurrenceTable occurrences = BuildOccurrenceTable(packed, variableCount);
+    OccurrenceTable occurrences = BuildOccurrenceTable(packed, varcount);
     SolverState state;
 
-    state.assignment = new int[variableCount + 1];
+    state.assignment = new int[varcount + 1];
     state.clauseUnassigned = new int[packed.clauseCount];
     state.clauseSatisfied = new int[packed.clauseCount]();
-    state.trail = new int[variableCount + 1];
-    state.queueCapacity = packed.clauseCount + variableCount + 1;
-    state.queue = new int[state.queueCapacity];
+    state.trail = new int[varcount + 1];
+    state.queuemax = packed.clauseCount + varcount + 1;
+    state.queue = new int[state.queuemax];
     state.touchedClauses = new int[packed.clauseCount];
     state.clauseStamp = new int[packed.clauseCount]();
-    state.scores = new unsigned long long[(variableCount + 1) * 2];
+    state.scores = new unsigned long long[(varcount + 1) * 2];
 
-    for (int variable = 0; variable <= variableCount; ++variable)
-        state.assignment[variable] = NO_ANSWER;
+    for (int var = 0; var <= varcount; ++var)
+        state.assignment[var] = noanswer;
 
     bool valid = true;
     int initialQueueTail = 0;
@@ -376,13 +376,13 @@ Status DPLL(Headnode* formula, int* result, int variableCount) {
     }
 
     const bool satisfiable = valid &&
-        SolveRecursive(packed, occurrences, variableCount, state);
+        SolveRecursive(packed, occurrences, varcount, state);
 
     if (satisfiable) {
-        for (int variable = 1; variable <= variableCount; ++variable) {
-            result[variable - 1] = state.assignment[variable] == NO_ANSWER
+        for (int var = 1; var <= varcount; ++var) {
+            result[var - 1] = state.assignment[var] == noanswer
                                        ? TRUE
-                                       : state.assignment[variable];
+                                       : state.assignment[var];
         }
     }
 
@@ -394,7 +394,7 @@ Status DPLL(Headnode* formula, int* result, int variableCount) {
     delete[] state.clauseSatisfied;
     delete[] state.clauseUnassigned;
     delete[] state.assignment;
-    DestroyOccurrenceTable(occurrences);
-    DestroyPackedFormula(packed);
+    DestroyOT(occurrences);
+    DestroyPF(packed);
     return satisfiable ? TRUE : FALSE;
 }

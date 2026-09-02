@@ -20,17 +20,17 @@ static void PrintFormula(const Headnode* formula) {
 }
 
 static int SolveFile(const std::string& filename, bool verify) {
-    int variableCount = 0;
-    Headnode* formula = ParseCnf(filename, variableCount);
+    int varnum = 0;
+    Headnode* formula = Create(filename, varnum);
 
     if (verify) {
         std::cout << "CNF verification:\n";
         PrintFormula(formula);
     }
 
-    int* result = new int[variableCount];
+    int* result = new int[varnum];
     const std::clock_t start = std::clock();
-    const Status status = DPLL(formula, result, variableCount);
+    const Status status = DPLL(formula, result, varnum);
     const std::clock_t finish = std::clock();
     const double milliseconds =
         static_cast<double>(finish - start) / CLOCKS_PER_SEC * 1000.0;
@@ -39,14 +39,14 @@ static int SolveFile(const std::string& filename, bool verify) {
     std::ofstream output(outputPath);
     if (!output) {
         delete[] result;
-        DestroyFormula(formula);
+        Destroy(formula);
         throw std::runtime_error("Cannot create result file: " + outputPath);
     }
 
     output << "s " << (status == TRUE ? 1 : 0) << '\n';
     output << "v";
     if (status == TRUE) {
-        for (int i = 0; i < variableCount; ++i)
+        for (int i = 0; i < varnum; ++i)
             output << ' ' << (result[i] == TRUE ? i + 1 : -(i + 1));
     }
     output << " 0\n";
@@ -57,19 +57,23 @@ static int SolveFile(const std::string& filename, bool verify) {
               << " ms\nSaved: " << outputPath << '\n';
 
     delete[] result;
-    DestroyFormula(formula);
+    Destroy(formula);
     return status == TRUE ? 0 : 1;
 }
 
 int main(int argc, char* argv[]) {
     try {
         if (argc == 3 && std::string(argv[1]) == "--star")
-            return SolveStarSudoku(argv[2]);
+            return Solvestar(argv[2]);
+
+        if (argc == 3 && std::string(argv[1]) == "--game")
+            return Playstar(argv[2]);
 
         if (argc < 2 || argc > 3 ||
             (argc == 3 && std::string(argv[2]) != "--verify")) {
             std::cout << "Usage: rewrite_dpll <file.cnf> [--verify]\n"
-                      << "       rewrite_dpll --star <puzzle.txt>\n";
+                      << "       rewrite_dpll --star <puzzle.txt>\n"
+                      << "       rewrite_dpll --game <puzzle.txt>\n";
             return argc < 2 ? 0 : 2;
         }
 

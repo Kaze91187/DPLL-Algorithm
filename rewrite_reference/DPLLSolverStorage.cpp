@@ -16,7 +16,7 @@ typedef struct PackedFormula {
     int* literals = nullptr;
 } PackedFormula;
 
-void DestroyFormula(Headnode* formula) {
+void Destroy(Headnode* formula) {
     while (formula != nullptr) {
         Headnode* nextClause = formula->next;
         Datanode* literal = formula->first;
@@ -78,7 +78,7 @@ static ClauseState EvaluateClause(
         const int literal = formula.literals[i];
         const int value = assignment[std::abs(literal)];
 
-        if (value == NO_ANSWER) {
+        if (value == noanswer) {
             ++unassignedCount;
             unitLiteral = literal;
         } else if ((literal > 0 && value == TRUE) ||
@@ -102,7 +102,7 @@ static void Rollback(
 ) {
     while (trailSize > checkpoint) {
         const int variable = trail[--trailSize];
-        assignment[variable] = NO_ANSWER;
+        assignment[variable] = noanswer;
     }
 }
 
@@ -147,7 +147,7 @@ static int SelectBranchVariable(
                 satisfied = true;
                 break;
             }
-            if (value == NO_ANSWER)
+            if (value == noanswer)
                 ++unassignedCount;
         }
 
@@ -160,7 +160,7 @@ static int SelectBranchVariable(
         for (int i = begin; i < end; ++i) {
             const int literal = formula.literals[i];
             const int variable = std::abs(literal);
-            if (assignment[variable] != NO_ANSWER)
+            if (assignment[variable] != noanswer)
                 continue;
             if (literal > 0)
                 positiveScore[variable] += weight;
@@ -172,7 +172,7 @@ static int SelectBranchVariable(
     int branchVariable = 0;
     unsigned long long bestScore = 0;
     for (int variable = 1; variable <= variableCount; ++variable) {
-        if (assignment[variable] != NO_ANSWER)
+        if (assignment[variable] != noanswer)
             continue;
         const unsigned long long total =
             positiveScore[variable] + negativeScore[variable];
@@ -254,7 +254,7 @@ Status DPLL(Headnode* formula, int* result, int variableCount) {
     int trailSize = 0;
 
     for (int i = 0; i <= variableCount; ++i)
-        assignment[i] = NO_ANSWER;
+        assignment[i] = noanswer;
 
     const bool satisfiable = SolveRecursive(
         packed, variableCount, assignment, trail, trailSize, scores
@@ -262,7 +262,7 @@ Status DPLL(Headnode* formula, int* result, int variableCount) {
 
     if (satisfiable) {
         for (int variable = 1; variable <= variableCount; ++variable) {
-            result[variable - 1] = assignment[variable] == NO_ANSWER
+            result[variable - 1] = assignment[variable] == noanswer
                                        ? TRUE
                                        : assignment[variable];
         }

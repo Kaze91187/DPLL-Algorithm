@@ -136,14 +136,40 @@ static Headnode* BuildStarFormula(const std::string& puzzle) {
     const int starCells[9][2] = {
         {1, 4}, {2, 2}, {2, 6},
         {4, 1}, {4, 4}, {4, 7},
-        {6, 2}, {6, 6}, {8, 4}
+        {6, 2}, {6, 6}, {7, 4}
     };
     AddRegionConstraints(formula, tail, starCells);
 
     return formula;
 }
 
-int SolveStarSudoku(const std::string& filename) {
+Status SolveStarPuzzle(const std::string& puzzle, int answer[ROW][COL]) {
+    if (puzzle.size() < ROW * COL)
+        throw std::runtime_error("Star sudoku puzzle must contain 81 cells");
+
+    Headnode* formula = BuildStarFormula(puzzle);
+    int result[729];
+    const Status status = DPLL(formula, result, 729);
+
+    if (status == TRUE) {
+        for (int row = 0; row < ROW; ++row) {
+            for (int column = 0; column < COL; ++column) {
+                answer[row][column] = 0;
+                for (int digit = 0; digit < 9; ++digit) {
+                    if (result[SudokuVariable(row, column, digit) - 1] == TRUE) {
+                        answer[row][column] = digit + 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    Destroy(formula);
+    return status;
+}
+
+int Solvestar(const std::string& filename) {
     std::ifstream input(filename);
     if (!input)
         throw std::runtime_error("Cannot open star sudoku file: " + filename);
@@ -156,25 +182,18 @@ int SolveStarSudoku(const std::string& filename) {
     if (puzzle.size() < 81)
         throw std::runtime_error("No 81-character puzzle was found");
 
-    Headnode* formula = BuildStarFormula(puzzle);
-    int result[729];
+    int answer[ROW][COL];
 
     const std::clock_t start = std::clock();
-    const Status status = DPLL(formula, result, 729);
+    const Status status = SolveStarPuzzle(puzzle, answer);
     const std::clock_t finish = std::clock();
 
     if (status == TRUE) {
         std::cout << "Star sudoku solution:\n";
         for (int row = 0; row < 9; ++row) {
             for (int column = 0; column < 9; ++column) {
-                int answer = 0;
-                for (int digit = 0; digit < 9; ++digit) {
-                    if (result[SudokuVariable(row, column, digit) - 1] == TRUE) {
-                        answer = digit + 1;
-                        break;
-                    }
-                }
-                std::cout << answer << (column == 8 ? '\n' : ' ');
+                std::cout << answer[row][column]
+                          << (column == 8 ? '\n' : ' ');
             }
         }
     } else {
@@ -184,6 +203,5 @@ int SolveStarSudoku(const std::string& filename) {
     std::cout << "Time: "
               << static_cast<double>(finish - start) / CLOCKS_PER_SEC * 1000.0
               << " ms\n";
-    DestroyFormula(formula);
     return status == TRUE ? 0 : 1;
 }
