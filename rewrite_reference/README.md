@@ -34,12 +34,15 @@
 4. `main.cpp`：读取命令行、计时、输出 `.res`。
 5. `StarSudoku.cpp`：将格、行、列、宫、星形区域约束加入公式，再调用同一个 DPLL。
 6. `StarSudokuGame.cpp`：读取题库并建立 Windows 图形游戏界面。
+7. `DPLLSolverBasic.cpp`：保留未优化的基础 DPLL，用于取得基准时间 `t`。
+8. `TestMode.cpp`：批量运行基础版与优化版，控制超时并生成测试表格。
 
 ## 编译
 
 ```powershell
 g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
-  main.cpp CnfParser.cpp DPLLSolverIncremental.cpp StarSudoku.cpp StarSudokuGame.cpp `
+  main.cpp CnfParser.cpp DPLLSolverBasic.cpp DPLLSolverIncremental.cpp `
+  StarSudoku.cpp StarSudokuGame.cpp TestMode.cpp `
   -lgdi32 -luser32 -o rewrite_dpll.exe
 ```
 
@@ -49,6 +52,8 @@ g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
 .\rewrite_dpll.exe ..\problems\sat-20.cnf --verify
 .\rewrite_dpll.exe --star <星形数独文件>
 .\rewrite_dpll.exe --game <星形数独文件>
+.\rewrite_dpll.exe --test ..\problems\sat-20.cnf ..\problems\ais10.cnf
+.\rewrite_dpll.exe --test-limit 5000 ..\problems\ais10.cnf
 ```
 
 游戏模式会把文件中的每个合法 81 字符格局作为一关。点击非提示格后，
@@ -56,6 +61,18 @@ g++ -std=c++11 -O2 -Wall -Wextra -pedantic `
 或切换上一关和下一关。选中玩家填写的格子后，也可以按退格键或 Delete 清空。
 
 项目附带 `Asterisk-sudoku-levels.txt`，其中包含 20 个可解关卡。直接双击
-`rewrite_dpll.exe`，或在终端中不带参数运行它，会自动读取这个内置题库并进入游戏。
+`rewrite_dpll.exe`，或在终端中不带参数运行它，会先显示模式菜单；选择游戏模式后
+自动读取这个内置题库。
+
+程序不带参数运行时会先选择游戏模式或测试模式。测试模式对每个算例分别记录：
+
+- 算例名、变元数、子句数、子句数/变元数；
+- 优化版结果 `SAT`、`UNSAT` 或超时后的 `UNKNOWN`；
+- 基础版时间 `t`、优化版时间 `to`；
+- 优化率 `[(t-to)/t]*100%`。
+
+默认时限为每个求解器、每个算例 30000 ms，也可用 `--test-limit` 修改。
+最终结果写入与 CNF 同名的 `.res` 文件，格式为 `s`、`v`、`t` 三行；优化版
+超时时写入 `s -1`。
 
 详细测试数据见 `BENCHMARK.md`。

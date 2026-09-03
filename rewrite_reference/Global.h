@@ -34,8 +34,13 @@ typedef struct Headnode {
 Headnode* Create(const std::string& filename, int& varnum);
 void Destroy(Headnode* formula);
 Status DPLL(Headnode* formula, int* result, int varnum);
+Status DPLLBasic(Headnode* formula, int* result, int varnum);
 Status SolveStarPuzzle(const std::string& puzzle, int answer[ROW][COL]);
 int Solvestar(const std::string& filename);
 int Playstar(const std::string& filename);
+int Testmode(const std::string& programPath,
+             const std::string* files,
+             int filecount,
+             unsigned int timeoutMs);
 
 #endif
